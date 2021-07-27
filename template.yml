@@ -96,9 +96,9 @@ Resources:
         IamInstanceProfile:
           Arn: !If [ IamInstanceProfileProvided, !Ref IamInstanceProfile, !Ref AWS::NoValue ] 
 
-    AutoScaleGroup:
-      Type: AWS::AutoScaling::AutoScalingGroup
-      Properties:
-        VPCZoneIdentifier: !Ref Subnets
-        MinSize: !Ref MinSize
-        MaxSize: !Ref MaxSize
+  AutoScaleGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier: !Ref Subnets
+      MinSize: !Ref MinSize
+      MaxSize: !Ref MaxSize
