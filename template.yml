@@ -42,6 +42,7 @@ Parameters:
   MaxSize:
     Type: Number
     Description: Maximum number of instances to boot.
+    Default: 3
 
 Conditions:
   IamInstanceProfileProvided:
