@@ -92,8 +92,7 @@ Resources:
             Ebs:
               VolumeSize: !Ref RootVolumeSize
               VolumeType: gp3
-        NetworkInterfaces:
-          - Groups: !Ref SecurityGroupId
+        SecurityGroupIds: !Ref SecurityGroupIds
         IamInstanceProfile:
           Arn: !If [ IamInstanceProfileProvided, !Ref IamInstanceProfile, !Ref AWS::NoValue ] 
 
