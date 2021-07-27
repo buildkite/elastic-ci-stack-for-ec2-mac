@@ -102,3 +102,6 @@ Resources:
       VPCZoneIdentifier: !Ref Subnets
       MinSize: !Ref MinSize
       MaxSize: !Ref MaxSize
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
