@@ -1,0 +1,94 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Buildkite Elastic Mac"
+
+Parameters:
+  HostFamily:
+    Type: String
+    Description: Host type to provision, e.g. mac1 for mac1.metal
+    Default: "mac1"
+
+  InstanceType:
+    Type: String
+    Description: Instance type to provision, e.g. mac1.metal
+    Default: "mac1.metal"
+
+  ImageId:
+    Type: AWS::EC2::Image::Id
+    Description: EC2 AMI to boot on the dedicated hosts.
+
+  RootVolumeSize:
+    Type: Number
+    Description: Root volume size in GiB
+
+  Subnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Subnets to launch dedicated instances in.
+
+  SecurityGroupIds:
+    Type: List<AWS::EC2::SecurityGroup::Id>
+    Description: The VPC security groups to associate with the network interface of launched instances.
+
+  MinSize:
+    Type: Number
+    Description: Minimum number of instances to boot.
+    Default: 0
+
+  MaxSize:
+    Type: Number
+    Description: Maximum number of instances to boot.
+
+Outputs:
+  ResourceGroupId:
+    Description: Dedicated resource group ID.
+    Value: !GetAtt DedicatedHostGroup.Arn
+
+Resources:
+  DedicatedHostGroup:
+    Type: AWS::ResourceGroups::Group
+    Properties:
+      Name: !Ref AWS::StackName
+      Configuration:
+        - Type: AWS::EC2::HostManagement
+          Parameters:
+            - Name: any-host-based-license-configuration
+              Values:
+                - true
+            - Name: allowed-host-families
+              Values: [ !Ref HostFamily ]
+            - Name: auto-allocate-host
+              Values:
+                - true
+            - Name: auto-release-host
+              Values:
+                - true
+        - Type: AWS::ResourceGroups::Generic
+          Parameters:
+            - Name: allowed-resource-types
+              Values:
+                - AWS::EC2::Host
+            - Name: deletion-protection
+              Values:
+                - UNLESS_EMPTY
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: !Ref ImageId
+        InstanceType: !Ref InstanceType
+        Placement:
+          HostResourceGroupArn: !GetAtt DedicatedHostGroup.Arn
+        BlockDeviceMappings:
+          - DeviceName: /dev/sda1
+            Ebs:
+              VolumeSize: !Ref RootVolumeSize
+              VolumeType: gp3
+        NetworkInterfaces:
+          - Groups: !Ref SecurityGroupId
+
+    AutoScaleGroup:
+      Type: AWS::AutoScaling::AutoScalingGroup
+      Properties:
+        VPCZoneIdentifier: !Ref Subnets
+        MinSize: !Ref MinSize
+        MaxSize: !Ref MaxSize
