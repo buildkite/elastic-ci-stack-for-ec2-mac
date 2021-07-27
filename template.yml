@@ -5,12 +5,12 @@ Description: "Buildkite Elastic Mac"
 Parameters:
   HostFamily:
     Type: String
-    Description: Host type to provision, e.g. mac1 for mac1.metal
+    Description: Host type to provision, e.g. mac1 for mac1.metal.
     Default: "mac1"
 
   InstanceType:
     Type: String
-    Description: Instance type to provision, e.g. mac1.metal
+    Description: Instance type to provision, e.g. mac1.metal.
     Default: "mac1.metal"
 
   ImageId:
@@ -19,7 +19,7 @@ Parameters:
 
   RootVolumeSize:
     Type: Number
-    Description: Root volume size in GiB
+    Description: Root volume size in GiB.
 
   Subnets:
     Type: List<AWS::EC2::Subnet::Id>
