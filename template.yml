@@ -29,6 +29,11 @@ Parameters:
     Type: List<AWS::EC2::SecurityGroup::Id>
     Description: The VPC security groups to associate with the network interface of launched instances.
 
+  IamInstanceProfile:
+    Type: String
+    Description: Optional. The IAM Instance Profile ARN to associate with instances.
+    Default: ""
+
   MinSize:
     Type: Number
     Description: Minimum number of instances to boot.
@@ -37,6 +42,10 @@ Parameters:
   MaxSize:
     Type: Number
     Description: Maximum number of instances to boot.
+
+Conditions:
+  IamInstanceProfileProvided:
+    !Not [ !Equals [ "", !Ref IamInstanceProfile ] ]
 
 Outputs:
   ResourceGroupId:
@@ -85,6 +94,8 @@ Resources:
               VolumeType: gp3
         NetworkInterfaces:
           - Groups: !Ref SecurityGroupId
+        IamInstanceProfile:
+          Arn: !If [ IamInstanceProfileProvided, !Ref IamInstanceProfile, !Ref AWS::NoValue ] 
 
     AutoScaleGroup:
       Type: AWS::AutoScaling::AutoScalingGroup
