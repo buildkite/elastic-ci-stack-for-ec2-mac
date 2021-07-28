@@ -44,6 +44,14 @@ Parameters:
     Description: Maximum number of instances to boot.
     Default: 3
 
+  BuildkiteAgentToken:
+    Type: String
+    Description: Buildkite Agent token.
+
+  BuildkiteAgentQueue:
+    Type: String
+    Description: Buildkite Queue to execute work for.
+
 Conditions:
   IamInstanceProfileProvided:
     !Not [ !Equals [ "", !Ref IamInstanceProfile ] ]
