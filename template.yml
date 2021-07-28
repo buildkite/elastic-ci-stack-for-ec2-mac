@@ -15,7 +15,7 @@ Parameters:
 
   ImageId:
     Type: AWS::EC2::Image::Id
-    Description: EC2 AMI to boot on the dedicated hosts.
+    Description: EC2 AMI to boot on the dedicated hosts. Expects auto-login for the ec2-user to be configured.
 
   RootVolumeSize:
     Type: Number
