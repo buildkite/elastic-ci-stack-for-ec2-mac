@@ -1,6 +1,6 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Buildkite Elastic Mac"
+Description: "Buildkite Elastic Mac %v"
 
 Parameters:
   HostFamily:
