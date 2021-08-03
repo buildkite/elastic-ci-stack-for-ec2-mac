@@ -1,8 +1,17 @@
-```
- ___  _   _  ___  _     ___   _  __ ___  _____  ___        _     ___  ___  ___ 
-| _ )| | | ||_ _|| |   |   \ | |/ /|_ _||_   _|| __|      | |   /   \| _ )/ __|
-| _ \| |_| | | | | |__ | |) ||   <  | |   | |  | _|       | |__ | - || _ \\__ \
-|___/ \___/ |___||____||___/ |_|\_\|___|  |_|  |___|      |____||_|_||___/|___/
-```
+# elastic-mac-for-aws
 
-elastic-mac-for-aws is an experimental project 🧑‍🔬🧪⚗️
+Elastic Mac for AWS is a CloudFormation template for you to deploy an auto
+scaling pool of mac1.metal EC2 instances.
+
+## elastic-mac-for-aws is an experimental project 🧑‍🔬🧪⚗️
+
+As an experimental project support may be withdrawn and the project archived in
+the future. Long term support is not guaranteed. There is no ongoing work or
+roadmap at this time. Community pull requests are encoraged and welcomed!
+
+## elastic-mac-for-aws is a supported project 📅
+
+Support is offered through June 2022.
+
+Support may be withdrawn at that time if the project is not viable. Support may
+be extended if the experiment is to be continued or adopted as a product.
