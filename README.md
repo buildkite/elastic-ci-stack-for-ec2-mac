@@ -1,7 +1,11 @@
 # elastic-mac-for-aws
 
-Elastic Mac for AWS is a CloudFormation template to deploy an auto
-scaling pool of EC2 mac1.metal instance based Buildkite Agents.
+Run your Buildkite Builds on AWS `mac1.metal` using this CloudFormation
+template. This template creates an Auto Scaling group, Launch Template, and Host
+Resource Group suitable for maintaining a pool of EC2 `mac1.metal` instances
+that run the Buildkite Agent. These agents can be used to run Buildkite
+Pipelines and build Xcode based software projects for macOS, iOS, iPadOS, tvOS,
+and watchOS.
 
 ## elastic-mac-for-aws is an experimental project 🧑‍🔬🧪⚗️
 
