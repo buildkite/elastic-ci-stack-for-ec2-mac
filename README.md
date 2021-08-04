@@ -29,5 +29,3 @@ Issue in this repository, or contact [Buildkite Support](https://buildkite.com/s
 
 See the [documentation](http://buildkite.com/docs/agent/v3/aws/autoscaling_mac_metal)
 for how to prepare and deploy this template to your AWS Account.
-
-[![Deploy CloudFormation Template](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=buildkite-mac&templateURL=https://s3.amazonaws.com/buildkite-serverless-apps-us-east-1/elastic-mac/template/latest.yml)
