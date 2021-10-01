@@ -9,21 +9,15 @@ and watchOS.
 
 ## elastic-mac-for-aws is an experimental project 🧑‍🔬🧪⚗️
 
-As an experimental project, support may be withdrawn and the project archived in
-the future. Long term support is not guaranteed. Issues and pull requests are
-encouraged and welcomed, though there is no ongoing work or roadmap at this
-time.
+As an experimental project, we will be regularly evaluating the adoption of this
+feature. Issues and pull requests are welcome and encouraged. If we discontinue
+the experiment due to lack of interest, we will provide guidance on migrating to
+a supported solution.
 
-## elastic-mac-for-aws is a supported project 📅
-
-Support is offered through June 2022.
-
-Support may be extended if the experiment is to be continued or adopted as a
-product. Support may also be withdrawn at that time if the project is not
-viable.
-
-If you experience issues using elastic-mac-for-aws please feel free to open an
-Issue in this repository, or contact [Buildkite Support](https://buildkite.com/support).
+Although this project is not under active development, we are interested in
+learning from your experience using it. If you are experiencing issues, please
+[open an Issue](https://github.com/buildkite/elastic-mac-for-aws/issues/new) in this repository, or contact [Buildkite Support](https://buildkite.com/support),
+so that we can work together on a solution.
 
 # Set-up instructions
 
