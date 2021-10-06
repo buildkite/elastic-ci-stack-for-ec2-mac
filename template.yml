@@ -46,7 +46,8 @@ Parameters:
 
   BuildkiteAgentToken:
     Type: String
-    Description: Buildkite Agent token.
+    NoEcho: true
+    Description: "Buildkite Agent token from https://buildkite.com/organizations/-/agents"
 
   BuildkiteAgentQueue:
     Type: String
