@@ -114,6 +114,7 @@ Resources:
               APFSCONT=$(diskutil list physical external | grep "Apple_APFS" | tr -s " " | cut -d" " -f8)
               yes | diskutil repairDisk $PDISK
               diskutil apfs resizeContainer $APFSCONT 0
+              systemsetup -setcomputersleep never
               user=ec2-user
               su - "${!user}" -c 'brew install buildkite/buildkite/buildkite-agent'
               config="$(brew --prefix)"/etc/buildkite-agent/buildkite-agent.cfg
