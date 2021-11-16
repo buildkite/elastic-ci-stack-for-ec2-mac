@@ -1,4 +1,4 @@
-# Elastic Mac for AWS
+# Elastic CI Stack for EC2 Mac
 
 Run your Buildkite Builds on [AWS EC2 Mac instances](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-mac-instances.html)
 using this CloudFormation template. This template creates an Auto Scaling
@@ -9,5 +9,5 @@ and watchOS.
 
 # Set-up instructions
 
-See the [documentation](https://buildkite.com/docs/agent/v3/elastic-mac-aws/autoscaling-mac-metal)
+See the [documentation](https://buildkite.com/docs/agent/v3/elastic-ci-stack-for-ec2-mac/autoscaling-mac-metal)
 for how to prepare and deploy this template to your AWS Account.
