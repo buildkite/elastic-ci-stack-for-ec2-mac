@@ -1,6 +1,6 @@
 # Elastic CI Stack for EC2 Mac
 
-<img alt="Elastic CI Stack for EC2 Mac" src="images/ec2mac-banner.png?raw=true">
+<h1><img alt="Elastic CI Stack for EC2 Mac" src="images/ec2mac-banner.png?raw=true"></h1>
 
 Run your Buildkite Builds on [AWS EC2 Mac instances](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-mac-instances.html)
 using this CloudFormation template. This template creates an Auto Scaling
