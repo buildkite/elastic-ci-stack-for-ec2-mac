@@ -48,6 +48,7 @@ Parameters:
     Type: String
     NoEcho: true
     Description: "Buildkite Agent token from https://buildkite.com/organizations/-/agents"
+    Default: ""
 
   BuildkiteAgentTokenParameterStorePath:
     Description: Existing SSM Parameter Store path to the Buildkite agent registration token (takes precedence over BuildkiteAgentToken). Expects a leading slash ('/').
@@ -68,6 +69,29 @@ Parameters:
 Conditions:
   IamInstanceProfileProvided:
     !Not [ !Equals [ "", !Ref IamInstanceProfile ] ]
+
+  UseCustomerManagedParameterPath:
+    !Not [ !Equals [ !Ref BuildkiteAgentTokenParameterStorePath, "" ] ]
+  UseCustomerManagedKeyForParameterStore:
+    !Not [ !Equals [ !Ref BuildkiteAgentTokenParameterStoreKMSKey, "" ] ]
+  CreateAgentTokenParameter:
+    !Equals [ !Ref BuildkiteAgentTokenParameterStorePath, "" ]
+
+
+Rules:
+  HasToken:
+    Assertions:
+      - Assert:
+          !Or
+            - !Not
+              - !Equals
+                - !Ref BuildkiteAgentToken
+                - ""
+            - !Not
+              - !Equals
+                - !Ref BuildkiteAgentTokenParameterStorePath
+                - ""
+        AssertDescription: "You must provide BuildkiteAgentToken or BuildkiteAgentTokenParameterStorePath"
 
 Outputs:
   ResourceGroupId:
@@ -120,20 +144,32 @@ Resources:
         UserData:
           Fn::Base64:
             !Sub
-              |
+            - |
+              Content-Type: text/x-shellscript; charset="us-ascii"
               #!/bin/bash
               PDISK=$(diskutil list physical external | head -n1 | cut -d" " -f1)
               APFSCONT=$(diskutil list physical external | grep "Apple_APFS" | tr -s " " | cut -d" " -f8)
               yes | diskutil repairDisk $PDISK
               diskutil apfs resizeContainer $APFSCONT 0
               systemsetup -setcomputersleep never
-              user=ec2-user
+              user=ec2-user 
               su - "${!user}" -c 'brew install buildkite/buildkite/buildkite-agent'
-              config="$(brew --prefix)"/etc/buildkite-agent/buildkite-agent.cfg
+              config="$BREW_PREFIX/etc/buildkite-agent/buildkite-agent.cfg"
+              BUILDKITE_AGENT_TOKEN=${BuildkiteAgentToken}
+              # Fetch token if BUILDKITE_AGENT_TOKEN is empty
+              if [ -z "$BUILDKITE_AGENT_TOKEN" ]
+              then
+                BUILDKITE_AGENT_TOKEN_PATH=${BuildkiteAgentTokenPath}
+                BUILDKITE_AGENT_TOKEN="$(aws ssm get-parameter --name "${BUILDKITE_AGENT_TOKEN_PATH}" --with-decryption --query Parameter.Value --output text)"
+              fi
               sed -i '' "s/xxx/${BuildkiteAgentToken}/g" "${!config}"
               echo "tags=\"queue=${BuildkiteAgentQueue},buildkite-mac-stack=%v\"" >> "${!config}"
               echo "tags-from-ec2=true" >> "${!config}"
               su - "${!user}" -c 'brew services start buildkite/buildkite/buildkite-agent'
+              --==BOUNDARY==--
+            - {
+                AgentTokenPath: !If [ UseCustomerManagedParameterPath, !Ref BuildkiteAgentTokenParameterStorePath, !Ref BuildkiteAgentTokenParameter ],
+              }
 
   AutoScaleGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -144,3 +180,46 @@ Resources:
       LaunchTemplate:
         LaunchTemplateId: !Ref LaunchTemplate
         Version: !GetAtt LaunchTemplate.LatestVersionNumber
+
+  BuildkiteAgentTokenParameter:
+    Type: AWS::SSM::Parameter
+    Condition: CreateAgentTokenParameter
+    Properties:
+      Name: !Sub "/${AWS::StackName}/buildkite/agent-token"
+      Type: String
+      Value: !Ref BuildkiteAgentToken
+
+  IAMRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: !If [ SetInstanceRoleName, !Ref InstanceRoleName, !Sub "${AWS::StackName}-Role" ]
+        PermissionsBoundary: !If [ SetInstanceRolePermissionsBoundaryARN, !Ref InstanceRolePermissionsBoundaryARN, !Ref "AWS::NoValue" ]
+        Policies:
+          - !If
+            - UseCustomerManagedKeyForParameterStore
+            - PolicyName: DecryptAgentToken
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - kms:Decrypt
+                    Resource: !Sub arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/${BuildkiteAgentTokenParameterStoreKMSKey}
+            - !Ref 'AWS::NoValue'
+          - PolicyName: ReadAgentToken
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action: ssm:GetParameter
+                  Resource:
+                    !Sub
+                      - arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterPath}
+                      - ParameterPath: !If [ UseCustomerManagedParameterPath, !Ref BuildkiteAgentTokenParameterStorePath, !Ref BuildkiteAgentTokenParameter ]
+        AssumeRolePolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: [ autoscaling.amazonaws.com, ec2.amazonaws.com ]
+              Action: sts:AssumeRole
+        Path: /
