@@ -49,9 +49,11 @@ Parameters:
     NoEcho: true
     Description: "Buildkite Agent token from https://buildkite.com/organizations/-/agents"
 
-  BuildkiteAgentQueue:
+  BuildkiteQueue:
+    Description: Queue name that agents will use, targeted in pipeline steps using "queue={value}"
     Type: String
-    Description: Buildkite Queue to execute work for.
+    Default: default
+    MinLength: 1
 
   KeyName:
     Description: Optional - SSH keypair used to access the buildkite instances via ec2_user, setting this will enable SSH ingress
@@ -76,6 +78,10 @@ Parameters:
     Description: The value of the Cost Allocation Tag used for billing purposes
     Default: "buildkite-elastic-ci-stack-for-aws"
 
+  InstanceName:
+    Type: String
+    Description: Optional - Customise the EC2 instance Name tag
+    Default: "buildkite-agent"
 
 Conditions:
   IamInstanceProfileProvided:
@@ -166,7 +172,7 @@ Resources:
               su - "${!user}" -c 'brew install buildkite/buildkite/buildkite-agent'
               config="$(brew --prefix)"/etc/buildkite-agent/buildkite-agent.cfg
               sed -i '' "s/xxx/${BuildkiteAgentToken}/g" "${!config}"
-              echo "tags=\"queue=${BuildkiteAgentQueue},buildkite-mac-stack=%v\"" >> "${!config}"
+              echo "tags=\"queue=${BuildkiteQueue},buildkite-mac-stack=%v\"" >> "${!config}"
               echo "tags-from-ec2=true" >> "${!config}"
               su - "${!user}" -c 'brew services start buildkite/buildkite/buildkite-agent'
 
