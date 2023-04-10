@@ -6,12 +6,12 @@ Parameters:
   HostFamily:
     Type: String
     Description: Host type to provision, e.g. mac1 for mac1.metal.
-    Default: "mac1"
+    Default: "mac2"
 
   InstanceType:
     Type: String
     Description: Instance type to provision, e.g. mac1.metal.
-    Default: "mac1.metal"
+    Default: "mac2.metal"
 
   ImageId:
     Type: AWS::EC2::Image::Id
@@ -53,9 +53,39 @@ Parameters:
     Type: String
     Description: Buildkite Queue to execute work for.
 
+  KeyName:
+    Description: Optional - SSH keypair used to access the buildkite instances via ec2_user, setting this will enable SSH ingress
+    Type: String
+    Default: ""
+
+  EnableCostAllocationTags:
+    Type: String
+    Description: Enables AWS Cost Allocation tags for all resources in the stack. See https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-alloc-tags.html
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "false"
+
+  CostAllocationTagName:
+    Type: String
+    Description: The name of the Cost Allocation Tag used for billing purposes
+    Default: "CreatedBy"
+
+  CostAllocationTagValue:
+    Type: String
+    Description: The value of the Cost Allocation Tag used for billing purposes
+    Default: "buildkite-elastic-ci-stack-for-aws"
+
+
 Conditions:
   IamInstanceProfileProvided:
     !Not [ !Equals [ "", !Ref IamInstanceProfile ] ]
+
+  HasKeyName:
+      !Not [ !Equals [ !Ref KeyName, "" ] ]
+
+  UseCostAllocationTags:
+      !Equals [ !Ref EnableCostAllocationTags, "true" ]
 
 Outputs:
   ResourceGroupId:
@@ -95,6 +125,7 @@ Resources:
       LaunchTemplateData:
         ImageId: !Ref ImageId
         InstanceType: !Ref InstanceType
+        KeyName: !If [ "HasKeyName", !Ref KeyName, !Ref 'AWS::NoValue' ]
         Placement:
           HostResourceGroupArn: !GetAtt DedicatedHostGroup.Arn
         BlockDeviceMappings:
@@ -105,6 +136,22 @@ Resources:
         SecurityGroupIds: !Ref SecurityGroupIds
         IamInstanceProfile:
           Arn: !If [ IamInstanceProfileProvided, !Ref IamInstanceProfile, !Ref AWS::NoValue ] 
+        TagSpecifications:
+            - ResourceType: instance
+              Tags:
+                - Key: Role
+                  Value: buildkite-agent
+                - Key: Name
+                  Value: !Ref InstanceName
+                - Key: BuildkiteAgentRelease
+                  Value: !Ref BuildkiteAgentRelease
+                - Key: BuildkiteQueue
+                  Value: !Ref BuildkiteQueue
+                - !If
+                  - UseCostAllocationTags
+                  - Key: !Ref CostAllocationTagName
+                    Value: !Ref CostAllocationTagValue
+                  - !Ref "AWS::NoValue"
         UserData:
           Fn::Base64:
             !Sub
