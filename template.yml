@@ -149,8 +149,6 @@ Resources:
                   Value: buildkite-agent
                 - Key: Name
                   Value: !Ref InstanceName
-                - Key: BuildkiteAgentRelease
-                  Value: !Ref BuildkiteAgentRelease
                 - Key: BuildkiteQueue
                   Value: !Ref BuildkiteQueue
                 - !If
