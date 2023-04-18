@@ -49,7 +49,7 @@ Parameters:
     NoEcho: true
     Description: "Buildkite Agent token from https://buildkite.com/organizations/-/agents"
 
-  BuildkiteQueue:
+  BuildkiteAgentQueue:
     Description: Queue name that agents will use, targeted in pipeline steps using "queue={value}"
     Type: String
     Default: default
@@ -149,8 +149,8 @@ Resources:
                   Value: buildkite-agent
                 - Key: Name
                   Value: !Ref InstanceName
-                - Key: BuildkiteQueue
-                  Value: !Ref BuildkiteQueue
+                - Key: BuildkiteAgentQueue
+                  Value: !Ref BuildkiteAgentQueue
                 - !If
                   - UseCostAllocationTags
                   - Key: !Ref CostAllocationTagName
@@ -170,7 +170,7 @@ Resources:
               su - "${!user}" -c 'brew install buildkite/buildkite/buildkite-agent'
               config="$(brew --prefix)"/etc/buildkite-agent/buildkite-agent.cfg
               sed -i '' "s/xxx/${BuildkiteAgentToken}/g" "${!config}"
-              echo "tags=\"queue=${BuildkiteQueue},buildkite-mac-stack=%v\"" >> "${!config}"
+              echo "tags=\"queue=${BuildkiteAgentQueue},buildkite-mac-stack=%v\"" >> "${!config}"
               echo "tags-from-ec2=true" >> "${!config}"
               su - "${!user}" -c 'brew services start buildkite/buildkite/buildkite-agent'
 
