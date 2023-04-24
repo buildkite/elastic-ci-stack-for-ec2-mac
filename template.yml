@@ -84,26 +84,15 @@ Parameters:
     Description: Optional - Customise the EC2 instance Name tag
     Default: "buildkite-agent"
 
-  EnableInstanceUserData:
-    Type: String
-    Description: Optional - Disables the EC2 instance UserData
-    AllowedValues:
-      - "true"
-      - "false"
-    Default: "true"
-
 Conditions:
   IamInstanceProfileProvided:
     !Not [ !Equals [ "", !Ref IamInstanceProfile ] ]
 
   HasKeyName:
-    !Not [ !Equals [ !Ref KeyName, "" ] ]
+      !Not [ !Equals [ !Ref KeyName, "" ] ]
 
   UseCostAllocationTags:
-    !Equals [ !Ref EnableCostAllocationTags, "true" ]
-
-  UseInstanceUserData:
-    !Equals [ !Ref EnableInstanceUserData, "true" ]
+      !Equals [ !Ref EnableCostAllocationTags, "true" ]
 
 Outputs:
   ResourceGroupId:
