@@ -84,15 +84,26 @@ Parameters:
     Description: Optional - Customise the EC2 instance Name tag
     Default: "buildkite-agent"
 
+  EnableInstanceUserData:
+    Type: String
+    Description: Optional - Enables the bootstrap commands for EC2 instances in the UserData field of the launch template
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "true"
+
 Conditions:
   IamInstanceProfileProvided:
     !Not [ !Equals [ "", !Ref IamInstanceProfile ] ]
 
   HasKeyName:
-      !Not [ !Equals [ !Ref KeyName, "" ] ]
+    !Not [ !Equals [ !Ref KeyName, "" ] ]
 
   UseCostAllocationTags:
-      !Equals [ !Ref EnableCostAllocationTags, "true" ]
+    !Equals [ !Ref EnableCostAllocationTags, "true" ]
+
+  UseInstanceUserData:
+    !Equals [ !Ref EnableInstanceUserData, "true" ]
 
 Outputs:
   ResourceGroupId:
