@@ -48,6 +48,7 @@ Parameters:
     Type: String
     NoEcho: true
     Description: "Buildkite Agent token from https://buildkite.com/organizations/-/agents"
+    Default: ""
 
   BuildkiteAgentQueue:
     Description: Queue name that agents will use, targeted in pipeline steps using "queue={value}"
@@ -83,15 +84,26 @@ Parameters:
     Description: Optional - Customise the EC2 instance Name tag
     Default: "buildkite-agent"
 
+  EnableInstanceUserData:
+    Type: String
+    Description: Optional - Enables the bootstrap commands for EC2 instances in the UserData field of the launch template
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "true"
+
 Conditions:
   IamInstanceProfileProvided:
     !Not [ !Equals [ "", !Ref IamInstanceProfile ] ]
 
   HasKeyName:
-      !Not [ !Equals [ !Ref KeyName, "" ] ]
+    !Not [ !Equals [ !Ref KeyName, "" ] ]
 
   UseCostAllocationTags:
-      !Equals [ !Ref EnableCostAllocationTags, "true" ]
+    !Equals [ !Ref EnableCostAllocationTags, "true" ]
+
+  UseInstanceUserData:
+    !Equals [ !Ref EnableInstanceUserData, "true" ]
 
 Outputs:
   ResourceGroupId:
@@ -125,6 +137,7 @@ Resources:
             - Name: deletion-protection
               Values:
                 - UNLESS_EMPTY
+
   LaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
@@ -158,21 +171,25 @@ Resources:
                   - !Ref "AWS::NoValue"
         UserData:
           Fn::Base64:
-            !Sub
-              |
-              #!/bin/bash
-              PDISK=$(diskutil list physical external | head -n1 | cut -d" " -f1)
-              APFSCONT=$(diskutil list physical external | grep "Apple_APFS" | tr -s " " | cut -d" " -f8)
-              yes | diskutil repairDisk $PDISK
-              diskutil apfs resizeContainer $APFSCONT 0
-              systemsetup -setcomputersleep never
-              user=ec2-user
-              su - "${!user}" -c 'brew install buildkite/buildkite/buildkite-agent'
-              config="$(brew --prefix)"/etc/buildkite-agent/buildkite-agent.cfg
-              sed -i '' "s/xxx/${BuildkiteAgentToken}/g" "${!config}"
-              echo "tags=\"queue=${BuildkiteAgentQueue},buildkite-mac-stack=%v\"" >> "${!config}"
-              echo "tags-from-ec2=true" >> "${!config}"
-              su - "${!user}" -c 'brew services start buildkite/buildkite/buildkite-agent'
+            !If
+              - UseInstanceUserData
+              - !Sub |
+                  #!/bin/bash
+                  PDISK=$(diskutil list physical external | head -n1 | cut -d" " -f1)
+                  APFSCONT=$(diskutil list physical external | grep "Apple_APFS" | tr -s " " | cut -d" " -f8)
+                  yes | diskutil repairDisk $PDISK
+                  diskutil apfs resizeContainer $APFSCONT 0
+                  systemsetup -setcomputersleep never
+                  user=ec2-user
+                  su - "${!user}" -c 'brew install buildkite/buildkite/buildkite-agent'
+                  config="$(brew --prefix)"/etc/buildkite-agent/buildkite-agent.cfg
+                  sed -i '' "s/xxx/${BuildkiteAgentToken}/g" "${!config}"
+                  echo "tags=\"queue=${BuildkiteAgentQueue},buildkite-mac-stack=%v\"" >> "${!config}"
+                  echo "tags-from-ec2=true" >> "${!config}"
+                  su - "${!user}" -c 'brew services start buildkite/buildkite/buildkite-agent'
+              - |
+                #!/bin/bash
+                echo "UserData was disabled"
 
   AutoScaleGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
