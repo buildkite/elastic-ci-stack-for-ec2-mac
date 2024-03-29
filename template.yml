@@ -34,6 +34,11 @@ Parameters:
     Description: Optional. The IAM Instance Profile ARN to associate with instances.
     Default: ""
 
+  InstanceRoleName:
+    Type: String
+    Description: Optional - A name for the IAM Role attached to the Instance Profile
+    Default: ""
+
   MinSize:
     Type: Number
     Description: Minimum number of instances to boot.
@@ -49,6 +54,13 @@ Parameters:
     NoEcho: true
     Description: "Buildkite Agent token from https://buildkite.com/organizations/-/agents"
     Default: ""
+
+  BuildkiteAgentTokenParameterStorePath:
+    Description: Existing SSM Parameter Store path to the Buildkite agent registration token (takes precedence over BuildkiteAgentToken). Expects a leading slash ('/').
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^/[a-zA-Z0-9_.\\-/]+$"
+    ConstraintDescription: "Expects a leading forward slash"
 
   BuildkiteAgentQueue:
     Description: Queue name that agents will use, targeted in pipeline steps using "queue={value}"
@@ -82,7 +94,7 @@ Parameters:
   InstanceName:
     Type: String
     Description: Optional - Customise the EC2 instance Name tag
-    Default: "buildkite-agent"
+    Default: ""
 
   EnableInstanceUserData:
     Type: String
@@ -91,6 +103,62 @@ Parameters:
       - "true"
       - "false"
     Default: "true"
+
+  InstanceRolePermissionsBoundaryARN:
+    Type: String
+    Description: The ARN of the policy used to set the permissions boundary for the role.
+    Default: ""
+  
+  ManagedPolicyARNs:
+    Type: CommaDelimitedList
+    Description: Optional - Comma separated list of managed IAM policy ARNs to attach to the instance role
+    Default: ""
+
+  BuildkiteAgentTokenParameterStoreKMSKey:
+    Description: AWS KMS key ID used to encrypt the SSM parameter (if encrypted)
+    Type: String
+    Default: ""
+
+  SecretsBucket:
+    Description: Optional - Name of an existing S3 bucket containing pipeline secrets (Created if left blank)
+    Type: String
+    Default: ""
+
+  SecretsBucketRegion:
+    Description: Optional - Region for the SecretsBucket. If blank the bucket's region is dynamically discovered.
+    Type: String
+    Default: ""
+
+  SecretsBucketEncryption:
+    Description: Indicates whether the SecretsBucket should enforce encryption at rest and in transit
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "false"
+
+  EnableSecretsPlugin:
+    Type: String
+    Description: Enables s3-secrets plugin for all pipelines
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "true"
+
+  ECRAccessPolicy:
+    Type: String
+    Description: ECR access policy to give container instances
+    AllowedValues:
+      - none
+      - readonly
+      - poweruser
+      - full
+    Default: "none"
+
+  ArtifactsBucket:
+    Description: Optional - Name of an existing S3 bucket for build artifact storage
+    Type: String
+    Default: ""
 
 Conditions:
   IamInstanceProfileProvided:
@@ -104,6 +172,59 @@ Conditions:
 
   UseInstanceUserData:
     !Equals [ !Ref EnableInstanceUserData, "true" ]
+
+  SetInstanceRoleName:
+    !Not [ !Equals [ !Ref InstanceRoleName, "" ] ]
+
+  SetInstanceRolePermissionsBoundaryARN:
+    !Not [ !Equals [ !Ref InstanceRolePermissionsBoundaryARN, "" ] ]
+
+  UseManagedPolicyARN:
+    !Not [ !Equals [ !Join [ "", !Ref ManagedPolicyARNs ], "" ] ]
+
+  HasManagedPolicies:
+    !Or [ { Condition: UseManagedPolicyARN }, { Condition: UseECR } ]
+
+  UseECR:
+    !Not [ !Equals [ !Ref ECRAccessPolicy, "none" ] ]
+
+  UseCustomerManagedParameterPath:
+    !Not [ !Equals [ !Ref BuildkiteAgentTokenParameterStorePath, "" ] ]
+
+  UseCustomerManagedKeyForParameterStore:
+    !Not [ !Equals [ !Ref BuildkiteAgentTokenParameterStoreKMSKey, "" ] ]
+
+  CreateAgentTokenParameter:
+    !Equals [ !Ref BuildkiteAgentTokenParameterStorePath, "" ]
+
+  CreateSecretsBucket:
+    !And
+        - !Equals [ !Ref EnableSecretsPlugin, "true"]
+        - !Equals [ !Ref SecretsBucket, "" ]
+
+  EnforceSecretsBucketEncryption:
+    !And
+        - !Condition CreateSecretsBucket
+        - !Equals [ !Ref SecretsBucketEncryption, "true"]
+
+  HasSecretsBucket:
+      !Or [ !Condition CreateSecretsBucket, !Condition UseSpecifiedSecretsBucket ]
+
+  UseSpecifiedSecretsBucket:
+      !Not [ !Equals [ !Ref SecretsBucket, "" ] ]
+
+  UseStackNameForInstanceName:
+      !Equals [ !Ref InstanceName, "" ]
+
+  UseArtifactsBucket:
+      !Not [ !Equals [ !Ref ArtifactsBucket, "" ] ]
+
+Mappings:
+  ECRManagedPolicy:
+    none      : { Policy: '' }
+    readonly  : { Policy: 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly' }
+    poweruser : { Policy: 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser' }
+    full      : { Policy: 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess' }
 
 Outputs:
   ResourceGroupId:
@@ -138,6 +259,140 @@ Resources:
               Values:
                 - UNLESS_EMPTY
 
+  IAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !If [ SetInstanceRoleName, !Ref InstanceRoleName, !Sub "${AWS::StackName}-Role" ]
+      PermissionsBoundary: !If [ SetInstanceRolePermissionsBoundaryARN, !Ref InstanceRolePermissionsBoundaryARN, !Ref "AWS::NoValue" ]
+      ManagedPolicyArns: !If
+          - HasManagedPolicies
+          # Support multiple policies to attach by merging the values together and splitting on ','
+          - !Split
+            - ','
+            # Join will skip over AWS::NoValue values
+            - !Join
+              - ','
+              - - !If
+                  - UseECR
+                  - !FindInMap [ ECRManagedPolicy, !Ref ECRAccessPolicy, 'Policy' ]
+                  - !Ref 'AWS::NoValue'
+                # This may support multiple values of its own (separated by commas)
+                - !If
+                  - UseManagedPolicyARN
+                  - !Join [ ',', !Ref ManagedPolicyARNs ]
+                  - !Ref 'AWS::NoValue'
+          - !Ref 'AWS::NoValue'
+      Policies:
+        - !If
+          - UseCustomerManagedKeyForParameterStore
+          - PolicyName: DecryptAgentToken
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - kms:Decrypt
+                  Resource: !Sub arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/${BuildkiteAgentTokenParameterStoreKMSKey}
+          - !Ref 'AWS::NoValue'
+        - PolicyName: ReadAgentToken
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource:
+                  !Sub
+                    - arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterPath}
+                    - ParameterPath: !If [ UseCustomerManagedParameterPath, !Ref BuildkiteAgentTokenParameterStorePath, !Ref BuildkiteAgentTokenParameter ]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ autoscaling.amazonaws.com, ec2.amazonaws.com ]
+            Action: sts:AssumeRole
+      Path: /
+
+  IAMPolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: InstancePolicy
+      PolicyDocument:
+        Statement:
+          - !If
+            - HasSecretsBucket
+            - Sid: SecretsBucket
+              Effect: Allow
+              Action:
+                - s3:Get*
+                - s3:List*
+              Resource:
+                - !Sub
+                  - "arn:aws:s3:::${Bucket}/*"
+                  - Bucket: !If [ CreateSecretsBucket, !Ref ManagedSecretsBucket, !Ref SecretsBucket ]
+                - !Sub
+                  - "arn:aws:s3:::${Bucket}"
+                  - Bucket: !If [ CreateSecretsBucket, !Ref ManagedSecretsBucket, !Ref SecretsBucket ]
+            - !Ref "AWS::NoValue"
+          - !If
+            - UseArtifactsBucket
+            - Sid: ArtifactsBucket
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:GetObjectAcl
+                - s3:GetObjectVersion
+                - s3:GetObjectVersionAcl
+                - s3:ListBucket
+                - s3:PutObject
+                - s3:PutObjectAcl
+                - s3:PutObjectVersionAcl
+              Resource:
+                - !Sub "arn:aws:s3:::${ArtifactsBucket}/*"
+                - !Sub "arn:aws:s3:::${ArtifactsBucket}"
+            - !Ref "AWS::NoValue"
+          - Effect: Allow
+            Action:
+              - autoscaling:DescribeAutoScalingInstances
+              - cloudwatch:PutMetricData
+              - cloudformation:DescribeStackResource
+              - ec2:DescribeTags
+            Resource: "*"
+          - Sid: TerminateInstance
+            Effect: Allow
+            Action:
+              - autoscaling:SetInstanceHealth
+              - autoscaling:TerminateInstanceInAutoScalingGroup
+            Resource: !Sub arn:${AWS::Partition}:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/${AWS::StackName}-AgentAutoScaleGroup-*
+          - Sid: Logging
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              - logs:DescribeLogGroups
+              - logs:DescribeLogStreams
+            Resource: "*"
+          - Sid: Ssm
+            Effect: Allow
+            Action:
+              - ssm:DescribeInstanceProperties
+              - ssm:ListAssociations
+              - ssm:PutInventory
+              - ssm:UpdateInstanceInformation
+              - ssmmessages:CreateControlChannel
+              - ssmmessages:CreateDataChannel
+              - ssmmessages:OpenControlChannel
+              - ssmmessages:OpenDataChannel
+              - ec2messages:AcknowledgeMessage
+              - ec2messages:DeleteMessage
+              - ec2messages:FailMessage
+              - ec2messages:GetEndpoint
+              - ec2messages:GetMessages
+              - ec2messages:SendReply
+            Resource: "*"
+      Roles:
+        - !Ref IAMRole
+
   LaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
@@ -161,7 +416,7 @@ Resources:
                 - Key: Role
                   Value: buildkite-agent
                 - Key: Name
-                  Value: !Ref InstanceName
+                  Value: !If [ UseStackNameForInstanceName, !Ref "AWS::StackName", !Ref InstanceName ]
                 - Key: BuildkiteAgentQueue
                   Value: !Ref BuildkiteAgentQueue
                 - !If
@@ -175,6 +430,7 @@ Resources:
               - UseInstanceUserData
               - !Sub |
                   #!/bin/bash
+                  set -x 
                   PDISK=$(diskutil list physical external | head -n1 | cut -d" " -f1)
                   APFSCONT=$(diskutil list physical external | grep "Apple_APFS" | tr -s " " | cut -d" " -f8)
                   yes | diskutil repairDisk $PDISK
@@ -200,3 +456,122 @@ Resources:
       LaunchTemplate:
         LaunchTemplateId: !Ref LaunchTemplate
         Version: !GetAtt LaunchTemplate.LatestVersionNumber
+
+  BuildkiteAgentTokenParameter:
+    Type: AWS::SSM::Parameter
+    Condition: CreateAgentTokenParameter
+    Properties:
+      Name: !Sub "/${AWS::StackName}/buildkite/agent-token"
+      Type: String
+      Value: !Ref BuildkiteAgentToken
+
+  ManagedSecretsLoggingBucket:
+    Type: AWS::S3::Bucket
+    Condition: CreateSecretsBucket
+    DeletionPolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        !If
+        - EnforceSecretsBucketEncryption
+        -
+          ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: "AES256"
+        - !Ref "AWS::NoValue"
+      Tags:
+        - !If
+          - UseCostAllocationTags
+          - Key: !Ref CostAllocationTagName
+            Value: !Ref CostAllocationTagValue
+          - !Ref "AWS::NoValue"
+
+  ManagedSecretsLoggingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: CreateSecretsBucket
+    Properties:
+      Bucket: !Ref ManagedSecretsLoggingBucket
+      PolicyDocument:
+        Id: ManagedSecretsLoggingBucketPolicy
+        Version: "2012-10-17"
+        Statement:
+        - Sid: S3ServerAccessLogsPolicy # Grant permissions to the logging service principal using a bucket policy (https://docs.aws.amazon.com/AmazonS3/latest/userguide/enable-server-access-logging.html)
+          Effect: Allow
+          Principal:
+            Service: 'logging.s3.amazonaws.com'
+          Action:
+          - 's3:PutObject'
+          Resource:
+          - !GetAtt 'ManagedSecretsLoggingBucket.Arn'
+          - !Sub '${ManagedSecretsLoggingBucket.Arn}/*'
+          Condition:
+            ArnLike:
+              'aws:SourceArn': !GetAtt 'ManagedSecretsBucket.Arn'
+            StringEquals:
+              'aws:SourceAccount': !Ref 'AWS::AccountId'
+        - !If
+          - EnforceSecretsBucketEncryption
+          - Sid: AllowSSLRequestsOnly # AWS Foundational Security Best Practices v1.0.0 S3.5
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+            - !GetAtt 'ManagedSecretsLoggingBucket.Arn'
+            - !Sub '${ManagedSecretsLoggingBucket.Arn}/*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': false
+          - !Ref "AWS::NoValue"
+
+  ManagedSecretsBucket:
+    Type: AWS::S3::Bucket
+    Condition: CreateSecretsBucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketEncryption:
+        !If
+        - EnforceSecretsBucketEncryption
+        -
+          ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: "AES256"
+        - !Ref "AWS::NoValue"
+      LoggingConfiguration:
+        DestinationBucketName: !Ref ManagedSecretsLoggingBucket
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - !If
+          - UseCostAllocationTags
+          - Key: !Ref CostAllocationTagName
+            Value: !Ref CostAllocationTagValue
+          - !Ref "AWS::NoValue"
+
+  ManagedSecretsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: EnforceSecretsBucketEncryption
+    Properties:
+      Bucket: !Ref ManagedSecretsBucket
+      PolicyDocument:
+        Id: ManagedSecretsBucketPolicy
+        Version: "2012-10-17"
+        Statement:
+        - Sid: AllowSSLRequestsOnly # AWS Foundational Security Best Practices v1.0.0 S3.5
+          Effect: Deny
+          Principal: '*'
+          Action: 's3:*'
+          Resource:
+          - !GetAtt 'ManagedSecretsBucket.Arn'
+          - !Sub '${ManagedSecretsBucket.Arn}/*'
+          Condition:
+            Bool:
+              'aws:SecureTransport': false
