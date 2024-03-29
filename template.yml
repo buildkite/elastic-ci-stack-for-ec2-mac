@@ -430,7 +430,6 @@ Resources:
               - UseInstanceUserData
               - !Sub |
                   #!/bin/bash
-                  set -x 
                   PDISK=$(diskutil list physical external | head -n1 | cut -d" " -f1)
                   APFSCONT=$(diskutil list physical external | grep "Apple_APFS" | tr -s " " | cut -d" " -f8)
                   yes | diskutil repairDisk $PDISK
@@ -575,4 +574,3 @@ Resources:
           Condition:
             Bool:
               'aws:SecureTransport': false
-              
