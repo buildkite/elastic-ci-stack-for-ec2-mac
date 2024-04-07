@@ -181,7 +181,7 @@ Resources:
                   diskutil apfs resizeContainer $APFSCONT 0
                   systemsetup -setcomputersleep never
                   sudo -u ec2-user -i <<'EOF'
-                  export PATH="/opt/homebrew/bin:$PATH"
+                  [ -x /opt/homebrew/bin/brew ] && eval "$(/opt/homebrew/bin/brew shellenv)"
                   brew install buildkite/buildkite/buildkite-agent
                   config="$(brew --prefix)"/etc/buildkite-agent/buildkite-agent.cfg
                   sed -i '' "s/xxx/${BuildkiteAgentToken}/g" "${!config}"
